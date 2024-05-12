@@ -10,14 +10,14 @@ import java.nio.charset.StandardCharsets;
 import java.util.Set;
 
 public class ChatServer {
-    private int DEFAULT_PORT = 8888;
-    private final String QUIT = "quit";
+    private static final int DEFAULT_PORT = 8888;
+    private static final String QUIT = "quit";
     private static final int BUFFER = 1024;
     private ServerSocketChannel server;
     private Selector selector;
     private ByteBuffer readBuffer = ByteBuffer.allocate(BUFFER);
     private ByteBuffer writeBuffer = ByteBuffer.allocate(BUFFER);
-    private Charset charset = StandardCharsets.UTF_8;
+    private Charset charset = Charset.forName("UTF-8");
     private int port;
 
     public ChatServer() {
@@ -61,10 +61,6 @@ public class ChatServer {
             clientChannel.configureBlocking(false);
             clientChannel.register(selector, SelectionKey.OP_READ);
             System.out.println(getClientName(clientChannel) + " connected.");
-//            SocketChannel client = (SocketChannel) key.channel();
-//            client.configureBlocking(false);
-//            client.register(selector, SelectionKey.OP_READ);
-//            System.out.println("Client[" + getClientName(client) + "] is connected");
         }
         // READ event - clients send msg to server
         else if (key.isReadable()) {
@@ -74,6 +70,7 @@ public class ChatServer {
                 key.cancel();
                 selector.wakeup();
             } else {
+                System.out.println("Client[" + getClientName(client) + "]: " + fwdMsg);
                 forwardMessage(client, fwdMsg);
 
                 // check client is quit or not?
@@ -89,13 +86,14 @@ public class ChatServer {
     private void forwardMessage(SocketChannel client, String fwdMsg) throws IOException {
         for (SelectionKey key : selector.keys()) {
             Channel connectedClient = key.channel();
-            if (connectedClient instanceof SocketChannel) {
+            if (connectedClient instanceof ServerSocketChannel) {
                 continue;
             }
 
             if (key.isValid() && !client.equals(connectedClient)) {
                 writeBuffer.clear();
                 writeBuffer.put(charset.encode("Clients[" + getClientName(client) + "]: " + fwdMsg));
+
                 writeBuffer.flip();
                 while (writeBuffer.hasRemaining()) {
                     ((SocketChannel) connectedClient).write(writeBuffer);
@@ -131,7 +129,8 @@ public class ChatServer {
     }
 
     public static void main(String[] args) {
-        ChatServer server = new ChatServer();
+        ChatServer server = new ChatServer(8888);
         server.start();
     }
 }
+
